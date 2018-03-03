@@ -67,18 +67,10 @@ def testfit(pesi):
 
 ##_creo la funzione che somma fondo e segnale ridati dalla funzione_differenza_____________________________________________________________________________
 def somma_fondo_segnale( npar, gin, f, pesi, iflag ):
-		'''
-		xlambda = 0.15
-		no_ovt = 0
-		for i in range(6+2):
-			for j in range(6):
-				no_ovt += pesi[i*6+j]*pesi[i*6+j]
-		'''
-	
-				
+		
 		f[0]  = funzione_differenza("TreeS",pesi,"segnale")
-		f[0] += funzione_differenza("TreeB",pesi, "fondo") #+ (1.0/2.0)*xlambda*no_ovt 
-		#print f[0]
+		f[0] += funzione_differenza("TreeB",pesi, "fondo")
+
 
 
 # creo la funzione che deve essere minimizzata
@@ -98,12 +90,7 @@ def funzione_differenza(fname,pesi,dato):
 		
 		
 		for j in range(n/6):
-			'''
-			n +=1 
-			if (n > 100):
-				break
-			'''
-			if (j < (n/6)/2.0):
+			if (j < int((n/6)*(2./3.))):
 				var = [float(strip(f.readline())) for i in range(6)]
 				if(dato == "segnale"):
 					funzione_minimizzare +=	(funzione_output(var,pesi)-1)**2
@@ -112,7 +99,7 @@ def funzione_differenza(fname,pesi,dato):
 
 		#print funzione_minimizzare * (1.0/2.0) + (1.0/2.0)* xlambda * no_ovt
 		f.close()
-		return funzione_minimizzare * (1.0/2.0) + (1.0/2.0)* xlambda * no_ovt
+		return funzione_minimizzare * (1.0/2.0) #+ (1.0/2.0)* xlambda * no_ovt
 
 
 def comp(fname,pesi,dato):
@@ -121,52 +108,40 @@ def comp(fname,pesi,dato):
 	massa = open("MassaData")
 	f = open(fname)
 	n = file_len(fname)
-	ind = 0
 	segnale = [None]*(n/12)
 	fondo = [None]*(n/12)
 	for m in range(n/6):
 		var = [float(strip(f.readline())) for i in range(6)]
 		if (dato == "segnale"):
-			if (m < (n/6.0)/2.):
+			if (m <  int((n/6.0)*(2./3.))):
 				histogram_training_segnale.Fill(funzione_output(var,pesi))
 			else:
-				a = funzione_output(var,pesi)
-				segnale[ind] = a
-				histogram_test_segnale.Fill(a)
-				ind +=1
+				histogram_test_segnale.Fill(funzione_output(var,pesi))
+				
 				
 		if(dato == "fondo"):
-			if (m < (n/6.0)/2.):
+			if (m < int((n/6.0)*(2./3.))):
 				histogram_training_fondo.Fill(funzione_output(var,pesi))
 			else:
-				b = funzione_output(var,pesi)
-				fondo[ind] = b
-				histogram_test_fondo.Fill(b)
-				ind +=1
+				histogram_test_fondo.Fill(funzione_output(var,pesi))
 		
 		if(dato == "data"):
-			
-			
-			histogram_data.Fill(funzione_output(var,pesi))
-			if (funzione_output(var,pesi) > 0.85):
-				histogram_massa_ricercata.Fill(float(strip(massa.readline())))
+			c = float(strip(massa.readline()))
+			histogram_massa.Fill(c)
+			b = funzione_output(var,pesi)
+			histogram_data.Fill(b)
+			if ( b >= 0.97):
+				histogram_massa_ricercata.Fill(c)
 		
 	 	
 	massa.close()
 	f.close()	
-	if (dato == "segnale"):
-		return segnale
-	elif(dato == "fondo"):
-		return fondo
-		
+	
 		
 # funzione di attivazione 
 def sigmoide(x):
-		
-		#x = clip(x,-500,500)
+	
 		sigm  = (arctan(x) + pi/2.0)/pi
-		#sigm = (tanh(x) + 1)/2 # funziona meglio non va in overflow
-		#sigm = 1.0/(1 + exp(-x)) #dava errore overlfow numeri troppo grandi per exp
 		return sigm
 	
 	
@@ -213,7 +188,7 @@ def ROC(pesi):
 	n_B = file_len("TreeB")
 	f_B = open("TreeB")
 	
-	passo = 0.01
+	passo = 0.001
 	gruppo_vero = [None]*int(1.0/passo)
 	gruppo_falso = [None]*int(1.0/passo)
 	indice = 0
@@ -264,41 +239,16 @@ if __name__ == '__main__':
 		npar = len(pesi)
 		minimo =  funzione_differenza("TreeS",pesi,"segnale") + funzione_differenza("TreeB",pesi,"fondo")
 		for i in range(100):
-			peso = [uniform(0,6)/sqrt(2.0/6.0) for j in range(48)]
+			peso = [uniform(-10,10) for j in range(48)]
 			f_min = funzione_differenza("TreeS",peso,"segnale") + funzione_differenza("TreeB",peso,"fondo") 
 			if(f_min < minimo):
 				minimo = f_min
 				pesi = peso
-			
 		
-		'''
-		print "-------"
-		print "-------"
-		print pesi
-		print minimo
-		print "-------"
-		print "-------"
-		'''
 		pesi_minimizzati = testfit(pesi)
-		'''
-		while abs(errore_NN(pesi_minimizzati,"segnale","training") - errore_NN(pesi_minimizzati,"fondo","test")) > 1 :
-			print "-----------------------------"
-			print "-----------------------------"
-			print errore_NN(pesi_minimizzati,"segnale","training") - errore_NN(pesi_minimizzati,"fondo","test")
-			print "-----------------------------"
-			print "-----------------------------"
-			pesi_minimizzati = testfit(pesi_minimizzati)
-		'''
 		
-		
-		with open("MassaData") as massa:
-			n = file_len("MassaData")
-			for n in range(n):
-				histogram_massa.Fill(float(strip(massa.readline())))
-		
-		
-		segnale = comp("TreeS",pesi_minimizzati,"segnale")
-		fondo = comp("TreeB",pesi_minimizzati,"fondo")
+		comp("TreeS",pesi_minimizzati,"segnale")
+		comp("TreeB",pesi_minimizzati,"fondo")
 		comp("Data",pesi_minimizzati,"data")
 		
 		ROC(pesi_minimizzati)
@@ -306,42 +256,64 @@ if __name__ == '__main__':
 		c1 = TCanvas()
 		c2 = TCanvas()
 		c3 = TCanvas()
-		
+		c4 = TCanvas()
+		c5 = TCanvas()
 		c1.Divide(2,1)
-		c2.Divide(2,2)
+		#c2.Divide(2,2)
 		
 		c1.cd(1)          
 		
+		histogram_training_segnale.GetXaxis().SetTitle("Output rete")
 		histogram_training_segnale.Draw()
 		histogram_training_fondo.SetLineColor(2)
 		histogram_training_fondo.Draw("SAME")
 		
 		c1.cd(2)
 		
+		histogram_test_segnale.GetXaxis().SetTitle("Output rete")
 		histogram_test_segnale.Draw()
 		histogram_test_fondo.SetLineColor(2)
 		histogram_test_fondo.Draw("SAME")
 		
-		c2.cd(1)
-		
-		histogram_data.Draw()
-		
-		
-		c2.cd(3)
-		histogram_massa.Draw()
-		
-		c2.cd(4)
-		histogram_massa_ricercata.Draw()
-		
+		c2.cd()
+		histogram_test_segnale.Draw()
+		histogram_training_segnale.SetLineColor(7)
+		histogram_training_segnale.Draw("SAME")
 		
 		c3.cd()
+		histogram_data.GetXaxis().SetTitle("Output rete")
+		histogram_data.Draw()
+		
+		'''
+		c2.cd(3)
+		
+		histogram_massa.GetXaxis().SetTitle("Massa")
+		histogram_massa.GetYaxis().SetTitle("Entrate")
+		histogram_massa.Draw()
+		'''
+		
+		c4.cd()
+		f = TF1 ("f"," exp([0]+[1]*x)",4000,6000)
+		f.SetParameter(0,20)
+		f.SetParameter(1,-0.3)
+		#f.SetParameter(2,-4800)
+		histogram_massa_ricercata.GetXaxis().SetTitle("Massa")
+		histogram_massa_ricercata.GetYaxis().SetTitle("Entrate")
+		histogram_massa_ricercata.Draw("EP")
+		histogram_massa_ricercata.Fit("f")
+		
+		
+		c5.cd()
 		
 		
 		ROC_gr.SetMinimum(0.)
 		ROC_gr.SetMaximum(1.1)
+		ROC_gr.SetTitle("Curva ROC")
+		ROC_gr.GetXaxis().SetTitle("Percentuale falsi positivi")
+		ROC_gr.GetYaxis().SetTitle("Percentuale veri positivi")
 		ROC_gr.Draw("AC")
 		
-		diag = TF1("diagonale","x",0,1)
+		diag = TF1("diagonale","x",-0.1,1)
 		diag.Draw("SAME")
 		
 		gApplication.Run()
